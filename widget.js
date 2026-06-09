@@ -6,7 +6,7 @@
 
 const ElevancyChat = (function () {
 
-  const SERVER_URL = "http://localhost:5000";
+  const SERVER_URL = "https://elevancy-server-production.up.railway.app";
   let conversationHistory = [];
   let chatOpen = false;
   let firstOpen = true;
