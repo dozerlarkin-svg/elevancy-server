@@ -4,9 +4,15 @@ import anthropic
 import os
 
 app = Flask(__name__)
-CORS(app, origins="*", allow_headers=["Content-Type"])
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+# Fix CORS for all origins
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "OPTIONS"]
+    }
+})
 
 
 def load_business_info():
@@ -43,7 +49,15 @@ def parse_section(info, section):
     return " | ".join(result) if result else "Not listed"
 
 
-@app.route("/business-info", methods=["GET"])
+@app.after_request
+def after_request(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    return response
+
+
+@app.route("/business-info", methods=["GET", "OPTIONS"])
 def business_info():
     info = load_business_info()
     data = {
@@ -57,8 +71,11 @@ def business_info():
     return jsonify(data)
 
 
-@app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST", "OPTIONS"])
 def chat():
+    if request.method == "OPTIONS":
+        return jsonify({}), 200
+
     info = load_business_info()
     system_prompt = f"""You are a friendly and professional AI receptionist for a local business.
 Your job is to help customers by answering their questions and booking appointments.
@@ -69,15 +86,15 @@ Here is everything you know about this business:
 How to behave:
 - Be warm and friendly like a real receptionist
 - Keep answers short — 2 to 3 sentences max
-- Always mention free estimates when pricing comes up
-- If someone wants to book ask for their name and phone number
-- For emergencies give the phone number immediately
+- Always mention free first session 50% off for new players
+- If someone wants to book ask for their name phone number and age
 - Never make up information not listed above
 - End with a helpful follow up question"""
 
     data = request.json
     messages = data.get("messages", [])
 
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     response = client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=300,
@@ -90,7 +107,6 @@ How to behave:
 
 @app.route("/widget.js")
 def serve_widget():
-    """Serves the embed script to any website."""
     return send_file("widget.js", mimetype="application/javascript")
 
 
